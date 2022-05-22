@@ -31,7 +31,7 @@ func serve(client net.Conn) {
 		_ = client.Close()
 	}(client)
 	buf, err := DecryptUnpackOne(client)
-	if errPrint(err) {
+	if checkNetError(err) {
 		return
 	}
 	var method, host, address string

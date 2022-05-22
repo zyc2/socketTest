@@ -69,13 +69,13 @@ func DecryptUnpackOne(src io.Reader) ([]byte, error) {
 		}
 		var dataLen uint16
 		err := binary.Read(bytes.NewBuffer(head), binary.BigEndian, &dataLen)
-		if errPrint(err) || dataLen == 0 {
+		if checkNetError(err) || dataLen == 0 {
 			return make([]byte, 0), err
 		}
 		packLen = int(dataLen) + 2
 		tmp := make([]byte, packLen-cnt)
 		n, err := src.Read(tmp)
-		if errPrint(err) {
+		if checkNetError(err) {
 			return make([]byte, 0), err
 		}
 		cnt += n
