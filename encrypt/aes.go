@@ -11,23 +11,17 @@ import (
 )
 
 var key []byte
-var block cipher.Block
-var encrypter cipher.BlockMode
-var decrypter cipher.BlockMode
 var BlockSize int
 
 func RestKey(token string) {
 	sum256 := sha256.Sum256([]byte(token))
 	key = sum256[:]
 	log.Printf("init key length(%d)\n", len(key))
-	tmp, err := aes.NewCipher(key)
+	block, err := aes.NewCipher(key)
 	if err != nil {
 		panic(err)
 	}
-	block = tmp
 	BlockSize = block.BlockSize()
-	encrypter = cipher.NewCBCEncrypter(block, key[:BlockSize])
-	decrypter = cipher.NewCBCDecrypter(block, key[:BlockSize])
 }
 
 func init() {
@@ -35,13 +29,35 @@ func init() {
 }
 
 func AesEncryptData(data []byte) []byte {
-	encryptBytes := pkcs7Padding(data, BlockSize)
-	encrypted := make([]byte, len(encryptBytes))
-	encrypter.CryptBlocks(encrypted, encryptBytes)
+	encrypted, _ := AesEncrypt(data, key)
 	return encrypted
 }
 
 func AesDecryptData(encrypted []byte) ([]byte, error) {
+	return AesDecrypt(encrypted, key)
+}
+
+func AesEncrypt(data []byte, key []byte) ([]byte, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return make([]byte, 0), errors.New(fmt.Sprintf("Encrypt key error length(%d)", len(key)))
+	}
+	BlockSize := block.BlockSize()
+	encrypter := cipher.NewCBCEncrypter(block, key[:BlockSize])
+	encryptBytes := pkcs7Padding(data, BlockSize)
+	encrypted := make([]byte, len(encryptBytes))
+	encrypter.CryptBlocks(encrypted, encryptBytes)
+	return encrypted, nil
+}
+
+func AesDecrypt(encrypted []byte, key []byte) ([]byte, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		log.Println(err)
+		panic(err)
+	}
+	BlockSize := block.BlockSize()
+	decrypter := cipher.NewCBCDecrypter(block, key[:BlockSize])
 	length := len(encrypted)
 	if length%BlockSize != 0 {
 		return make([]byte, 0), errors.New(fmt.Sprintf("Decrypt length(%d) error", length))

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"log"
 	"proxy/encrypt"
@@ -29,10 +30,7 @@ func transformIoEncrypt(dst io.Writer, src io.Reader) {
 	for {
 		buf := make([]byte, buffSize-encrypt.BlockSize)
 		n, err := src.Read(buf)
-		if err != nil {
-			if err != io.EOF {
-				log.Println(err)
-			}
+		if checkNetError(err) {
 			break
 		}
 		if n == 0 {
@@ -41,7 +39,7 @@ func transformIoEncrypt(dst io.Writer, src io.Reader) {
 		pack := EncryptPack(buf[:n])
 		if len(pack) > 0 {
 			_, ew := dst.Write(pack)
-			if errPrint(ew) {
+			if checkNetError(ew) {
 				break
 			}
 		}
@@ -58,10 +56,7 @@ func DecryptUnpackOne(src io.Reader) ([]byte, error) {
 		if cnt < 2 {
 			tmp := make([]byte, 2-cnt)
 			n, err := src.Read(tmp)
-			if err != nil {
-				if err != io.EOF && !strings.Contains(err.Error(), "use of closed network connection") {
-					errPrint(err)
-				}
+			if checkNetError(err) {
 				return make([]byte, 0), err
 			}
 			for i := 0; i < n; i++ {
@@ -99,7 +94,7 @@ func transformIoDecrypt(dst io.Writer, src io.Reader) {
 		onePack, err := DecryptUnpackOne(src)
 		if len(onePack) > 0 {
 			_, ew := dst.Write(onePack)
-			if errPrint(ew) {
+			if checkNetError(ew) {
 				break
 			}
 		}
@@ -107,4 +102,25 @@ func transformIoDecrypt(dst io.Writer, src io.Reader) {
 			break
 		}
 	}
+}
+
+var ignoreNetErrors = []string{
+	"EOF",
+	"use of closed network connection",
+	"connection reset by peer",
+	"broken pipe",
+	//"operation timed out",
+}
+
+func checkNetError(err error) bool {
+	if err != nil {
+		message := err.Error()
+		for _, ignore := range ignoreNetErrors {
+			if strings.Contains(message, ignore) {
+				return err != nil
+			}
+		}
+		_ = log.Output(2, fmt.Sprintln(err))
+	}
+	return err != nil
 }
